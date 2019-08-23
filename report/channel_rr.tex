@@ -3,7 +3,7 @@
 \usepackage{graphicx}
 \begin{document}
 
-\title{Lightweight RR for Intermittent Tests Failures}
+\title{Lightweight Record-and-Replay for Intermittent Tests Failures}
 \author[1]{Omar S Navarro Leija}
 \author[2]{Alan Jeffrey}
 \affil[1]{Mozilla Research Intern, University Of Pennsylvania}
@@ -12,17 +12,18 @@
 \maketitle
 
 \begin{abstract}
-  In this paper we present lightweight RR. In contrast to traditional ``fully deterministic''
+  In this paper we present lightweight record-and-replay (RR).
+  In contrast to traditional ``fully deterministic''
   RR solutions, lightweight RR focuses on handling nondeteminism arising from thread
-  communication and OS scheduling for programs with concurrent, message-passing
+  communication for programs with concurrent, message-passing
   architectures. By decreasing nondeterminsm in programs, lightweight RR is meant to
-  decrease the number of intermittent failures in program's test suites. RR is
-  robust program execution divergence during replay. We evaluated the effectiveness
-  of lightweight RR on Servo, a highly concurrent web browser. As it currently stands,
-  lightweight RR failed to live up in terms of effectiveness or performance.
-  We believe with further work lightweight RR could prove useful at its goals of:
-  lowering determinism in programs, small record logs, and negligible performance
-  overhead.
+  decrease the number of intermittent failures in program's test suites.
+  We evaluated the effectiveness of lightweight RR on Servo,
+  a highly concurrent web browser. Our evaluation shows lightweight RR is effective
+  at greatly reducing intermittent failures for some tests, but not others. Lightweight
+  RR performance overhead remains a work in progress, but log sizes are quite small.
+  We believe with further work lightweight RR could prove useful for
+  lowering nondeterminism in programs at a negligible performance overhead.
 \end{abstract}
 
 \section{Background}
@@ -31,8 +32,8 @@
 Slowdowns of single-core performance gains in computing systems have given rise to the need
 for highly concurrent systems that take advantage of multiple cores now available
 in all machines.
-Concurrent systems are normally implemented using a thread plus shared-memory.
-Using memory locks to enforce exclusive writes to memory. This type of systems make
+Concurrent systems are normally implemented using a thread plus shared-memory,
+using memory locks to enforce exclusive writes to memory. This type of systems make
 it difficult to reason about many useful properties of concurrent programs:
 data race freedom and deadlock avoidance.
 Furthermore shared data and the locks that protect it are often logically decoupled. That is,
@@ -46,15 +47,15 @@ threads or processes communicate via channels, sending data as messages to each 
 This avoids the need for the programmer to worry about data races, memory consistency
 models, or other low-level details. Furthermore channels come in many flavors:
 bounded, unbounded, blocking, non-blocking, and more. Channels can be implemented using
-shared memory, with lock or lock-free queues. So channels have similar performance the
+shared memory, with lock or lock-free queues. Channels have comparable performance to the
 lock and shared memory approach.
 
 \subsection{Intermittent Failures In Servo}
-Servo is a parallel browser engine with the lotfy goals: highly concurrent,
+Servo is a parallel browser engine with the goals: highly concurrent,
 memory safe, and easily embeddable. Servo achieves these goals thanks to
-its use of Rust, a novel systems programming language with stronger memory safety and
-datarace freedom, static guarantees. As well as featuring a concurrent message passing
-architecture. This allows servo to be highly concurrent, maximizing parallelism,
+its use of Rust, a novel systems programming language with stronger memory safety,
+data race freedom, and static guarantees, as well as featuring a concurrent message passing
+architecture. This allows Servo to be highly concurrent, maximizing parallelism,
 while maintaining its components decoupled.
 
 Nondeterminism is inherent to concurrent systems. Servo is no exception. Adding to
@@ -71,9 +72,9 @@ Servo which cause intermittent failures.
 
 \subsection{Existing Record-and-Replay Solutions}
 Record-and-replay has been widely studied in academia and used in industry. One
-such state-of-the-art system is Mozilla's \textit{RR} project. Which serves
-as a robust record-and-replay debugging framework. It is successfully used in production
-with codebases consisting of millions of lines of code like the Firefox Web browser.
+such state-of-the-art system is Mozilla's \textit{RR} project, which serves
+as a robust RR debugging framework. It is successfully used in production
+with codebases consisting of millions of lines of code like the Firefox web browser.
 At a high-level, Mozilla RR works by intercepting nondeterminstic OS system calls and recording
 their values, as well as recording thread and process scheduling so later it can faithfully
 replay them. During replay, Mozilla RR uses its log to replay the system calls with the same
@@ -85,7 +86,7 @@ processes, incurring particularly high performance overhead on parallel workload
 
 While in principal Mozilla RR is able to solve the problem with intermittent failures in Servo,
 we believe there can be a far more lightweight, high-level approach.
-RR only works for Linux, as it relies on many low-level OS details.
+Mozilla RR's implementation is OS dependent as it relies on many low-level OS details.
 Lightweight RR attempts tame some of the nondeteminism inherent to concurrent systems
 while operating at a much higher level: channel communication and thread scheduling.
 All while preserving parallelism in programs, and offering low overhead.
@@ -101,8 +102,6 @@ execution is recorded making the implementation fast and the logs small.
 
 Lightweight RR handles the following sources of nondeterminism:
 \begin{itemize}
-\item Thread scheduling, this is your garden-variety nondeterminism
-  inherent to concurrent systems.
 \item Message arrival order. While messages sent by a thread down a channel are guaranteed to arrive in FIFO order, multiple threads may be sending messages to the same channel simultaneously. Thus, message arrival order can vary.
 \item Select operation. Channel implementations often have a \textit{select} operation. A select allows for nondeterministically receiving one or more message(s) from any channel with a message at the time of the operation, or blocking until a message arrives.
 \end{itemize}
