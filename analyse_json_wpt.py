@@ -3,6 +3,9 @@ Given the json output for running
 ./mach test-wpt --headless --release --log-wptreport ../experiments/baseline_all/results0 (cat ../experiments/intermittent_failures.txt)
 
 Get the fields and data we're interested in.
+
+If "all" is given, all tests found in the json files are added. Otherwise, only the tests
+specified in the file are checked.
 '''
 
 import json
@@ -21,23 +24,31 @@ class Test:
         self.duration = duration
         self.name = name
         self.subtests = subtests
-        self.result = result
-class Result:
-    test_name = ""
-    duration = -1
-    test_name = ""
-
-    def __init__(self, status, duration, test_name):
-        self.status = status
         self.duration = duration
-        self.test_name = test_name
+        self.result = result
 
+# class Result:
+#     test_name = ""
+#     duration = -1
+#     test_name = ""
 
-if len(sys.argv) != 2:
-    print("Usage python3 analyse_json_wpt.py path_to_result_dir/")
+#     def __init__(self, status, duration, test_name):
+#         self.status = status
+#         self.duration = duration
+#         self.test_name = test_name
+
+if len(sys.argv) != 3:
+    print("Usage python3 analyse_json_wpt.py path_to_result_dir/ [all|tests_to_analyse.txt]")
     sys.exit(1)
 baseline_dir = sys.argv[1]
 all_results = {}
+tests_to_analyse = None if sys.argv[2] == "all" else sys.argv[2]
+
+if tests_to_analyse is not None:
+    fin = open(tests_to_analyse)
+    tests_to_analyse = []
+    for line in fin:
+        tests_to_analyse.append(line.strip())
 
 # Read all the files and aggregate all the tests into all_results.
 # Which is a list of all tests indexed by the test name.
@@ -47,19 +58,24 @@ for filename in os.listdir(baseline_dir):
     json_file = baseline_dir + "/" + filename
     print("Reading in file", json_file)
     contents = json.load(open(json_file))
-    test_results = contents["results"]
 
-    for result in test_results:
+    for result in contents["results"]:
+        test_name = result["test"]
+
+        if tests_to_analyse is not None:
+            if test_name not in tests_to_analyse:
+                print("Skipping", test_name)
+                continue
+
         # Append entry to vector for all entries of this specific test.
-        test = Test(result["status"], result["duration"], result["test"], result["subtests"], result)
+        test = Test(result["status"], result["duration"], test_name, result["subtests"], result)
 
         if test.name not in all_results:
             all_results[test.name] = [test]
         else:
             all_results[test.name].append(test)
 
-print("NAME, EXPECTED, UNEXPECTED, CRASH, TIMEOUT, SKIP, ERROR")
-
+final_results = []
 # Iterate over test names where `tests` is a list of test trials.
 for (name, tests) in all_results.items():
     expected = 0
@@ -68,6 +84,7 @@ for (name, tests) in all_results.items():
     timeout = 0
     skip = 0
     error = 0
+    expected_runtime = 0
 
     # Iterate over individual test trials for a given test.
     for test in tests:
@@ -82,6 +99,7 @@ for (name, tests) in all_results.items():
                 unexpected += 1
             else:
                 expected += 1
+                expected_runtime += test.duration
 
 
         elif test.status == "FAIL":
@@ -91,6 +109,7 @@ for (name, tests) in all_results.items():
                 unexpected += 1
             else:
                 expected += 1
+                expected_runtime += test.duration
 
             if test.subtests != []:
                 print("Exected FAIL not to have subtest. This assumption is false")
@@ -122,6 +141,7 @@ for (name, tests) in all_results.items():
                 unexpected += 1
             else:
                 expected += 1
+                expected_runtime += test.duration
                 #     if subtest["status"] == "PASS":
             #         continue
             #     elif subtest["status"] == "FAIL":
@@ -189,5 +209,15 @@ for (name, tests) in all_results.items():
     #     succ_average_runtime = pass_total_runtime / passes
     # else:
     #     succ_average_runtime = 0
+    if expected != 0:
+        average = expected_runtime
+    else:
+        average = 0
 
-    print("{}, {}, {}, {}, {}, {}, {}".format(name, expected, unexpected, crash, timeout, skip, error))
+    final_results.append((name, expected, unexpected, crash, timeout, skip, error, average))
+
+
+final_results = sorted(final_results, key=lambda t: t[0])
+print("NAME, EXPECTED, UNEXPECTED, CRASH, TIMEOUT, SKIP, ERROR")
+for (name, expected, unexpected, crash, timeout, skip, error, average) in final_results:
+    print("{}, {}, {}, {}, {}, {}, {}, {}".format(name, expected, unexpected, crash, timeout, skip, error, average))
