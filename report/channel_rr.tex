@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage{authblk}
+\usepackage{preprint/authblk}
 \usepackage{graphicx}
 \begin{document}
 
@@ -375,9 +375,13 @@ soon.
   \label{fig:result_timing}
 \end{figure}
 
-
-
 \subsection{Space overhead}
+For the evaluation, the logs were written out using a compact, binary serializer.
+Out of 30 recorded logs from our tests above, the median log size was 78.5KB.
+A more in depth comparison would be needed to compare log sizes versus existing
+systems like \texttt{rr}. However, we believe the log sizes are small enough to
+not add a storage burden, even for test suites with tens of thousands of tests.
+
 \section{Discussion}
 \label{sec:discussion}
 The current evaluation results are disappointing to say the least. Here we discuss
