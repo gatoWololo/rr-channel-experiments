@@ -20,8 +20,7 @@ Notice not all tests on github issues still exist in the Servo Repository. These
 ### Running Experiments
 The main script to run experiments is `run_intermittent_failures_tests.py`. This script accepts several subcommands:
 - `run_baseline <tests_file> <output_dir/>` Accepts a list of tests to run (like `interesting_intermittents.txt`) and runs all the tests `test_runs` number of times (default is currently 100). Outputs a directory `<output_dir>` containing the raw logs of tests
-
-                       analyse_output     tests_file baseline_results/
+- `analyse_output <tests_file> <baseline_results/>`: 
                        record_tests         tests_file output_dir/
                        run_replay           tests_file output_dir/ record_dir/
                        analyse_do_not_exist tests_file results/\
