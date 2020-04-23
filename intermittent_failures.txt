@@ -1,3 +1,5 @@
+# This file was generated from the `github_scrape_intermittent_failures.py` code.
+# It lists all tests in Servo that were known to have intermittent failures.
 /2dcontext/drawing-paths-to-the-canvas/drawFocusIfNeeded_005.html
 /2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.css-color-4-rgba-2.html
 /2dcontext/fill-and-stroke-styles/2d.gradient.radial.negative.html

@@ -1,3 +1,6 @@
+# This file is a subset of `intermittent_failures.txt`. The github issues were stale and some of the
+# intermittent failure tests (github issues marked as intermittent) no longer existed in the wpt-test/
+# directory. These are all the tests we found that no longer existed in the repository.
 /compositing-1_dev/html/mix-blend-mode-animation.htm
 /css21_dev/html4/abs-pos-non-replaced-vlr-145.htm
 /css21_dev/html4/abspos-replaced-width-margin-000.htm

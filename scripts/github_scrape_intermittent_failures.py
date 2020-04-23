@@ -1,5 +1,5 @@
-# Code to get the intermittent failure titles. Not actually a script.
-# Just fragments of code.
+## Script to scrape all github issues from Servo containing "I-intermittent" in its label.
+## These results created the /intermittent_failures.txt file.
 
 In [1]: from github import Github
 
