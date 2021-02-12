@@ -1,4 +1,4 @@
-intermittent\_failures.txt was created using code along the lines of github\_scrape\_intermittent_failures.py.
+# RR-Channels Experiments
 
-intermittent\_failures.txt is the raw names scrapes from github. The paths start at servo/tests/wpt/web-platform-tests/. Note: Not all tests may still exist in Servo.
-
+This repository holds all relevant scripts, and maybe data (depending on size of data) related to the [Tivo
+project](https://github.com/upenn-acg/tivo).
