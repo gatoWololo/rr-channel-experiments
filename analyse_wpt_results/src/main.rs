@@ -3,8 +3,9 @@ use glob::glob;
 use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::io::Write;
+use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
@@ -13,7 +14,7 @@ type TestStatusCounts = HashMap<TestStatus, u32>;
 /// We have one command to execute and global flags that apply to all commands. Each command may
 /// further have its own parameters and flags.
 #[derive(Debug, StructOpt)]
-#[structopt(about = "Parsing Script for Servo WPT JSON and Logs.")]
+#[structopt(about = "Parsing Script for Servo WPT JSON Logs.")]
 struct CmdLineOptions {
     #[structopt(subcommand)]
     command: SubCommands,
@@ -31,10 +32,11 @@ struct CmdLineOptions {
 #[derive(StructOpt, Debug)]
 enum SubCommands {
     /// Count how many tests returned an unexpected status. This is basically the number of tests
-    /// that failed. Does not do anything special with intermittents.
+    /// that failed. Does not do anything special with intermittent tests.
     CountUnexpectedTestsStatus,
     /// Return the lists of
     GetIntermittents,
+    /// Print all tests with the given specified TestStatus.
     GetLogOutput {
         #[structopt(parse(try_from_str = status_from_str))]
         status: TestStatus,
@@ -79,7 +81,7 @@ enum TestStatus {
 
 /// Overall structure of Serde log-wptreport output. We're really interested in the `results` field.
 /// Which we handle and parse separately.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 struct WptLog {
     run_info: Value,
@@ -90,7 +92,7 @@ struct WptLog {
 
 /// We leave `Value` (i.e. untyped data) for fields we don't yet handle or don't know what they
 /// look like.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 struct Test {
     status: TestStatus,
@@ -109,7 +111,7 @@ struct Test {
     expected: Option<TestStatus>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 struct SubTest {
     // TODO
@@ -148,41 +150,47 @@ fn main() -> anyhow::Result<()> {
             println!("Total Intermittent Tests: {}", hm.len());
         }
         SubCommands::GetLogOutput { status } => {
-            get_log_output(wpt_logs, status)?;
+            let tests_with_status = get_log_output(wpt_logs, status)?;
+            let n = tests_with_status.len();
+
+            let mut f = BufWriter::new(File::create(opt.output)?);
+            for t in tests_with_status {
+                writeln!(f, "{}", t)?;
+            }
+
+            println!("{} tests found with status {:?}", n, status);
         }
     }
 
     Ok(())
 }
 
-fn get_log_output(_wpt_logs: Vec<WptLog>, _status: TestStatus) -> Result<Vec<String>> {
-    // Print names of all tests with FAIL status.
-    todo!("Implement")
-    // let wpt_tests: Vec<Test> = wpt_logs
-    //     .into_iter()
-    //     .flat_map(|wpt_log| wpt_log.results)
-    //     .collect();
-    //
-    // let mut how_many = 0;
-    // for t in wpt_tests {
-    //     if t.expected.is_some() {
-    //         println!(
-    //             "Test: {}. Status: {:?}. Expected Status {:?}",
-    //             t.test_name,
-    //             t.status,
-    //             t.expected.unwrap()
-    //         );
-    //         how_many += 1;
-    //     }
-    // }
-    // dbg!(how_many);
-    //
-    // for t in wpt_tests {
-    //     if t.status == TestStatus::Fail {
-    //         println!("Test: {}. Expected Result {:?}", t.test_name, t.expected);
-    //         println!("Subtests: {}", t.subtests.len());
-    //     }
-    // }
+/// Return tests which always have status TestStatus. Accounts for intermittent tests as if a test
+/// is seen multiple times, it must return the same status on all executions.
+fn get_log_output(wpt_logs: Vec<WptLog>, status: TestStatus) -> Result<HashSet<String>> {
+    let wpt_tests: HashSet<String> = wpt_logs
+        .clone()
+        .into_iter()
+        .flat_map(|wpt_log| wpt_log.results)
+        .filter_map(|t| {
+            if t.expected.is_none() && t.status == status {
+                return Some(t.test_name);
+            }
+            None
+        })
+        .collect();
+
+    let intermittents: HashSet<String> = get_intermittents(wpt_logs)
+        .with_context(|| "Unable to get intermittents.")?
+        .into_iter()
+        .map(|t| t.0)
+        .collect();
+
+    let tests = wpt_tests
+        .difference(&intermittents)
+        .map(|t| t.to_owned())
+        .collect();
+    Ok(tests)
 }
 
 /// Ensure all test-runs have the same number of tests.
@@ -234,6 +242,9 @@ fn get_intermittents(wpt_logs: Vec<WptLog>) -> Result<HashMap<String, TestStatus
     Ok(only_intermittents)
 }
 
+/// Tests status only makes sense when comparing their actual test status vs their unexpected test
+/// status. For example an actual test status of "Crash" could actual be Ok if we expected a Crash
+/// for a test.
 fn count_unexpected_test_statuses(wpt_logs: Vec<WptLog>) -> Result<HashMap<TestStatus, u32>> {
     let hm: HashMap<String, TestStatusCounts> = unexpected_status_per_tests(wpt_logs);
 
@@ -309,7 +320,7 @@ fn read_json_file(input_dir: PathBuf, file_pattern: &str) -> Result<Vec<WptLog>>
     let pattern: String = input_dir.to_string_lossy().into_owned() + "/" + file_pattern;
     let files: Vec<PathBuf> = glob(&pattern)
         .with_context(|| "Failed to glob()")?
-        // Turn a Vec<Result<_, _>> into a Result<Vec<_>, _>
+        // Turns a Vec<Result<_, _>> into a Result<Vec<_>, _>
         .collect::<Result<Vec<PathBuf>, _>>()?;
 
     let logs: Vec<WptLog> = files
